@@ -1,1 +1,6 @@
-__pycache__/\n*.pyc\n.env\nimg_src/\nface_metadata.json\n*.sqlite3\n*.db
+# 파이썬 캐시 파일
+__pycache__/
+*.pyc
+
+# 환경 변수 파일
+.env
