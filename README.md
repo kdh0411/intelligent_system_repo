@@ -1,12 +1,4 @@
-# 코드 실행 환경 초기화로 재작성
-
-readme_md = """
 # 📚 Intelligent System: AI 도서관 키오스크 프로젝트
-
-<img src="https://img.shields.io/badge/Project-SmartLibrary-blue?style=for-the-badge" alt="badge"/>
-<img src="https://img.shields.io/badge/Tech-FaceRecognition-green?style=for-the-badge"/>
-<img src="https://img.shields.io/badge/UI-HTML%2FCSS%2FJS-yellow?style=for-the-badge"/>
-<img src="https://img.shields.io/badge/Backend-Flask-lightgrey?style=for-the-badge"/>
 
 ---
 
@@ -18,7 +10,7 @@ readme_md = """
 
 ---
 
-## 🚀 주요 기능
+## 🚀 주요 기능 (변경예정)
 
 - 📸 얼굴 인식 로그인 / 회원가입 (MTCNN + FaceNet)
 - 🧑‍🎓 학번 + 비밀번호 로그인 (옵션)
@@ -29,5 +21,6 @@ readme_md = """
 
 ---
 
-## 📁 프로젝트 구조 (예정)
+## 📁 프로젝트 구조도 (변경예정)
 
+![Image](https://github.com/user-attachments/assets/b9392df5-89a0-4bda-b30f-163287e34cd4)
