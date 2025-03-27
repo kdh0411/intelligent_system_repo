@@ -1,0 +1,44 @@
+<!-- UI/welcome.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI 도서관 키오스크</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      font-size: 2em;
+    }
+    .button-group {
+      margin-top: 40px;
+    }
+    button {
+      margin: 10px;
+      padding: 15px 30px;
+      font-size: 1em;
+      border: none;
+      border-radius: 10px;
+      background-color: #0077cc;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fa3;
+    }
+  </style>
+</head>
+<body>
+  <h1>📚 AI 도서관 키오스크</h1>
+  <p>원하는 기능을 선택해주세요</p>
+
+  <div class="button-group">
+    <button onclick="location.href='/login'">🔐 로그인</button>
+    <button onclick="location.href='/register'">📝 회원가입</button>
+  </div>
+</body>
+</html>
