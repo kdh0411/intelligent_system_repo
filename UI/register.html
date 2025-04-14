@@ -1,3 +1,4 @@
+<!-- UI/register.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -6,49 +7,48 @@
   <style>
     body {
       font-family: sans-serif;
+      background-color: #f4f4f4;
+      padding: 50px;
       text-align: center;
-      padding: 40px;
-      background-color: #f8f8f8;
     }
     input, button {
       padding: 10px;
       margin: 10px;
-      width: 250px;
       font-size: 1em;
     }
-    .form-box {
-      display: inline-block;
-      text-align: left;
-    }
-    button {
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 8px;
-    }
-    button:hover {
-      background-color: #218838;
+    .message {
+      color: green;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>📝 회원가입</h2>
-  <div class="form-box">
-    <form action="/register" method="POST">
-      <label>이름</label><br>
-      <input type="text" name="name" required /><br>
+  <h1>📝 회원가입</h1>
 
-      <label>학번</label><br>
-      <input type="text" name="student_id" required /><br>
+  <!-- 얼굴 등록 완료 메시지 -->
+  {% if request.args.get("face") == "success" %}
+    <p class="message">✅ 얼굴 등록이 완료되었습니다!</p>
+  {% endif %}
 
-      <label>비밀번호</label><br>
-      <input type="password" name="password" required /><br>
+  <!-- DB 저장 결과 메시지 -->
+  {% if message %}
+    <p class="message">{{ message }}</p>
+  {% endif %}
 
-      <p>얼굴 등록은 아래 버튼 클릭 후 캠으로 진행됩니다</p>
-      <button type="button" onclick="window.location.href='/register/face'">📸 얼굴 등록(선택)</button><br><br>
+  <!-- 회원가입 기본 정보 입력 -->
+  <form method="POST" action="/register">
+    <input type="text" name="student_id" placeholder="학번" required><br>
+    <input type="text" name="name" placeholder="이름" required><br>
+    <input type="password" name="password" placeholder="비밀번호" required><br>
+    <button type="submit">회원가입 완료</button>
+  </form>
 
-      <button type="submit">가입 완료</button>
+  <!-- 얼굴 등록 버튼 -->
+  {% if request.args.get("face") != "success" %}
+    <form method="GET" action="/register/face">
+      <button type="submit">📸 얼굴 등록하기</button>
     </form>
-  </div>
+  {% endif %}
+
 </body>
 </html>
