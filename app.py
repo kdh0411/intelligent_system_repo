@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, session, url_for
 from face.face_save import FaceSaver
 from face.face_detect import FaceDetect  
 import json
+from chatbot.chatbot import ChatBot
 
 # HTML 파일들이 UI 폴더 안에 있으므로 경로 지정
 app = Flask(__name__, template_folder="UI")
@@ -121,28 +122,15 @@ def main():
 # ---------------챗봇--------------------#
 @app.route("/chatbot", methods=["GET", "POST"])
 def chatbot():
-    response = ""
+    response = None
+    query = None
+
     if request.method == "POST":
-        user_input = request.form["user_input"]
+        query = request.form["query"]
+        bot = ChatBot()
+        response = bot.ask(query)
 
-        # ✅ 간단한 rule 기반 응답
-        if "대출" in user_input:
-            response = "📚 도서는 최대 14일 동안 대출할 수 있어요."
-        elif "연장" in user_input:
-            response = "⏱️ 도서 연장은 1회 가능하며, 연장 시 추가 7일이 제공됩니다."
-        elif "반납" in user_input:
-            response = "📮 반납은 무인 반납함 또는 안내 데스크를 이용해주세요."
-        elif "연체" in user_input:
-            response = "⚠️ 연체 시 하루 100원의 연체료가 부과됩니다."
-        elif "도서관" in user_input or "운영 시간" in user_input:
-            response = "🕐 도서관은 평일 09:00~22:00, 주말 10:00~18:00 운영됩니다."
-        else:
-            response = "죄송해요, 이해하지 못했어요. '대출', '반납', '연장' 등으로 다시 물어보세요!"
-
-    return render_template("chatbot.html", response=response)
-
-
-
+    return render_template("chatbot.html", query=query, response=response)
 
 
 # 서버 실행
