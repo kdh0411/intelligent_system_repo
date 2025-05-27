@@ -1,6 +1,6 @@
 import subprocess
 
-class ChatBot:
+class ChatBot_mistral:
     def __init__(self, model="mistral:instruct"):
         self.model = model
 
