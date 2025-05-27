@@ -52,7 +52,12 @@ class BookCrawler:
             location = cells[0].text.strip().replace("\n", " ") if len(cells) > 0 else "없음"
 
             # ✅ 책장위치 매핑
-            shelf_map = {"6F": "4번 책장", "5F": "3번 책장", "4F": "2번 책장", "3F": "1번 책장"}
+            shelf_map = {
+                "6F": "4번",
+                "5F": "3번",
+                "4F": "2번",
+                "3F": "1번"
+            }            
             shelf_position = next((shelf_map[floor] for floor in shelf_map if floor in location), None)
 
             book_info.update({

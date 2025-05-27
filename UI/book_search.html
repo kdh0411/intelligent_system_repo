@@ -122,7 +122,6 @@
       background-color: #145ea8;
     }
 
-    /* 요약 탭 스타일 */
     .tab-menu {
       display: flex;
       justify-content: center;
@@ -160,6 +159,12 @@
 
     .summary-text {
       white-space: normal;
+    }
+
+    #robot-message {
+      margin-top: 10px;
+      color: green;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -213,10 +218,10 @@
           <button type="submit">📝 도서 상세 정보</button>
         </form>
         {% if book_info.get('책장위치') %}
-          <form method="POST" action="/book/guide">
-            <input type="hidden" name="shelf" value="{{ book_info['책장위치'] }}">
-            <button type="submit">📍 도서 위치 안내받기</button>
-          </form>
+          <button class="btn btn-secondary btn-lg call-robot-btn" data-zone="{{ book_info['책장위치'] }}">
+            📍 도서 위치 안내받기
+          </button>
+          <p id="robot-message" style="margin-top: 10px; color: green; font-weight: bold;"></p>
         {% endif %}
       {% endif %}
     </div>
@@ -255,5 +260,35 @@
       if (tabLinks.length > 0) tabLinks[0].click();
     </script>
   {% endif %}
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".call-robot-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          const zone = button.dataset.zone;
+          const msg = document.getElementById("robot-message");
+  
+          // ✅ 클릭 순간 바로 표시
+          if (msg) msg.innerText = "🤖 로봇이 이동 중입니다. 로봇을 따라가세요!";
+  
+          // 실제 로봇 호출
+          fetch("/call_robot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ zone: zone })
+          })
+          .catch(() => {
+            if (msg) msg.innerText = "❌ 로봇 호출 실패";
+          });
+        });
+      });
+    });
+  </script>
+
 </body>
 </html>
+
+
+  <!-- ROS2 웹소켓브릿지용 
+  <script src="{{ url_for('static', filename='roslib.min.js') }}"></script> -->
+<!-- <script src="{{ url_for('static', filename='robot_call.js') }}"></script> -->

@@ -11,7 +11,11 @@ from threading import Event
 from functools import wraps  
 from datetime import timedelta
 from book.summary import BookDetailExtractor
-
+from robot.robot_controller import (
+    send_goal_to_bookshelf,
+    send_goal_to_table_or_home
+)# 로봇 임시
+import subprocess
 
 # HTML 파일들이 UI 폴더 안에 있으므로 경로 지정
 app = Flask(__name__, template_folder="UI", static_folder="UI/static")
@@ -171,10 +175,12 @@ def detect_face():
     result = face_detector.recognize_face_from_frame(latest_frame)
 
     if result.get("match"):
+        session.permanent = True
+        session["student_id"] = result["student_id"]
         return jsonify({"success": True, "student_id": result["student_id"]})
     else:
         return jsonify({"success": False, "progress": result.get("progress", 0)})
-    
+
 
 # --------------- 로그인 후 메인(기능 선택)-------------------# 
 @app.route("/main")
@@ -260,27 +266,34 @@ def book_summary():
 
     return render_template("book_search.html", book_info=session.get("book_info"), summary=summary_data)
 
+#---------로봇 제어 ------------#
 
-#---------로봇 호출 ------------#
-#페이지 라우팅
-@app.route("/robot_control", methods=["GET"])
-@login_required
-def robot_control():
-    return render_template("robot_control.html")
-
-#호출 처리
-@app.route("/robot/call", methods=["POST"])
+# --------------- 로봇 호출 제어 페이지 -------------------#
+@app.route("/robot_call", methods=["GET"])
 @login_required
 def robot_call():
+    return render_template("robot_call.html")
+
+#---------로봇 주행 ------------#
+@app.route("/call_robot", methods=["POST"])
+@login_required
+def call_robot():
     data = request.get_json()
-    target = data.get("target")
+    print("[DEBUG] 받은 데이터:", data)
 
-    # 👉 추후 여기에 ROS2 액션 연결 예정
-    print(f"📡 로봇 호출 요청 수신: {target}")
+    if not data or "zone" not in data:
+        return jsonify({"success": False, "message": "❗ zone 값이 없습니다."}), 400
 
-    return jsonify({"message": f"🛰 '{target}' 호출 명령 전송됨"})
+    zone = data["zone"]
 
+    if zone in {"1번", "2번", "3번", "4번"}:
+        success, message = send_goal_to_bookshelf(zone)
+    elif zone in {"shelf1", "shelf2", "shelf3", "shelf4", "home"}:
+        success, message = send_goal_to_table_or_home(zone)
+    else:
+        success, message = False, "❌ 알 수 없는 zone입니다."
 
+    return jsonify({"success": success, "message": message}), (200 if success else 400)
 
 # 서버 실행
 if __name__ == "__main__":

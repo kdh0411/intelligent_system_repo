@@ -20,7 +20,7 @@ class FaceDetect:
         self.embeddings = self.load_embeddings_from_db()
         self.stable_user = None
         self.stable_count = 0
-        self.required_count = 20  # ✅ 연속 인식 기준 프레임 수
+        self.required_count = 8  # ✅ 연속 인식 기준 프레임 수
 
     def load_embeddings_from_db(self):
         conn = sqlite3.connect(self.DB_PATH)
