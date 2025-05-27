@@ -1,5 +1,3 @@
-# face/face_detect.py
-
 import os
 import json
 import sqlite3
@@ -20,6 +18,9 @@ class FaceDetect:
         self.facenet = InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
 
         self.embeddings = self.load_embeddings_from_db()
+        self.stable_user = None
+        self.stable_count = 0
+        self.required_count = 20  # ✅ 연속 인식 기준 프레임 수
 
     def load_embeddings_from_db(self):
         conn = sqlite3.connect(self.DB_PATH)
@@ -56,7 +57,43 @@ class FaceDetect:
     def calculate_distance(self, emb1, emb2):
         return np.linalg.norm(emb1 - emb2)
 
+    def feed_frame(self, frame):
+        """한 프레임 입력 → 내부 상태 업데이트 → 매칭 결과 리턴"""
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        embedding, box = self.extract_embedding(frame_rgb)
+
+        if embedding is None:
+            self.stable_user = None
+            self.stable_count = 0
+            return {"match": False}
+
+        match_id = "No Match"
+        for student_id, ref_emb in self.embeddings.items():
+            if self.calculate_distance(embedding, ref_emb) < 0.8:
+                match_id = student_id
+                break
+
+        if match_id == self.stable_user:
+            self.stable_count += 1
+        else:
+            self.stable_user = match_id
+            self.stable_count = 1 if match_id != "No Match" else 0
+
+        if self.stable_user != "No Match" and self.stable_count >= self.required_count:
+            result = self.stable_user
+            self.stable_user = None
+            self.stable_count = 0
+            return {"match": True, "student_id": result}
+        else:
+            return {
+                "match": False,
+                "progress": self.stable_count if self.stable_user != "No Match" else 0,
+                "match_id": match_id,
+                "box": box
+            }
+
     def recognize_face(self):
+        """OpenCV 창 띄우고 실시간 인식 테스트"""
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -67,32 +104,14 @@ class FaceDetect:
 
         print("📸 얼굴 인식 중입니다. 30프레임 동안 같은 사용자 유지 시 로그인됩니다.")
 
-        frame_count = 0
-        stable_user = None
-        stable_count = 0
-
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
-                print("❌ 캠 오류")
                 break
 
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            embedding, box = self.extract_embedding(frame_rgb)
-
-            match_id = "No Match"
-            if embedding is not None:
-                for student_id, ref_emb in self.embeddings.items():
-                    distance = self.calculate_distance(embedding, ref_emb)
-                    if distance < 0.8:
-                        match_id = student_id
-                        break
-
-            if match_id == stable_user and match_id != "No Match":
-                stable_count += 1
-            else:
-                stable_user = match_id
-                stable_count = 1 if match_id != "No Match" else 0
+            result = self.feed_frame(frame)
+            box = result.get("box")
+            match_id = result.get("match_id", "No Match")
 
             if box is not None:
                 x1, y1, x2, y2 = [int(b) for b in box]
@@ -101,11 +120,12 @@ class FaceDetect:
                 cv2.putText(frame, match_id, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
             cv2.imshow("Face Login", frame)
-            if stable_count >= 30:
-                print(f"✅ 로그인 성공: {stable_user}")
+
+            if result.get("match"):
+                print(f"✅ 로그인 성공: {result['student_id']}")
                 cap.release()
                 cv2.destroyAllWindows()
-                return stable_user
+                return result["student_id"]
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -113,3 +133,17 @@ class FaceDetect:
         cap.release()
         cv2.destroyAllWindows()
         return "No Match"
+
+    def recognize_face_from_frame(self, frame):
+        """Flask용 AJAX 라우팅에서 한 프레임 처리"""
+        return self.feed_frame(frame)
+
+#테스트
+if __name__ == "__main__":
+    detector = FaceDetect()
+    student_id = detector.recognize_face()
+
+    if student_id == "No Match":
+        print("❌ 얼굴 인식 실패")
+    else:
+        print(f"✅ 로그인 성공: {student_id}")
