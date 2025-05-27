@@ -1,54 +1,157 @@
-<!-- UI/register.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>회원가입</title>
+  <title>회원가입 | 한성대 학술정보관</title>
   <style>
     body {
-      font-family: sans-serif;
-      background-color: #f4f4f4;
-      padding: 50px;
+      font-family: 'Arial', sans-serif;
+      background-color: #e0f2ff;
+      margin: 0;
       text-align: center;
     }
+    .container {
+      max-width: 420px;
+      margin: auto;
+      padding: 40px 20px;
+      background-color: #e0f2ff;
+      min-height: 100vh;
+    }
+    h2 {
+      color: #1976d2;
+      font-size: 1.8em;
+      margin-bottom: 30px;
+    }
     input, button {
-      padding: 10px;
-      margin: 10px;
+      padding: 12px;
+      margin: 10px 0;
       font-size: 1em;
+      border: none;
+      border-radius: 30px;
+      width: 80%;
+      box-sizing: border-box;
+    }
+    input {
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #1976d2;
+      color: white;
+      cursor: pointer;
+      font-size: 1em;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #145ea8;
     }
     .message {
-      color: green;
+      color: #2e7d32;
       font-weight: bold;
+      margin-top: 10px;
+      font-size: 1.05em;
+    }
+    .error {
+      color: #d32f2f;
+    }
+    #face-section {
+      margin-top: 20px;
+      padding: 20px;
+      background-color: #d0eaff;
+      border-radius: 16px;
+      border: 2px dashed #1976d2;
     }
   </style>
 </head>
 <body>
-  <h1>📝 회원가입</h1>
+  <div class="container">
+    <h2>학술정보관 회원가입</h2>
 
-  <!-- 얼굴 등록 완료 메시지 -->
-  {% if request.args.get("face") == "success" %}
+    {% if face_success %}
     <p class="message">✅ 얼굴 등록이 완료되었습니다!</p>
-  {% endif %}
+    {% endif %}
 
-  <!-- DB 저장 결과 메시지 -->
-  {% if message %}
-    <p class="message">{{ message }}</p>
-  {% endif %}
+    {% if message %}
+    <p class="message {{ 'error' if '실패' in message else '' }}">{{ message }}</p>
+    {% endif %}
 
-  <!-- 회원가입 기본 정보 입력 -->
-  <form method="POST" action="/register">
-    <input type="text" name="student_id" placeholder="학번" required><br>
-    <input type="text" name="name" placeholder="이름" required><br>
-    <input type="password" name="password" placeholder="비밀번호" required><br>
-    <button type="submit">회원가입 완료</button>
-  </form>
-
-  <!-- 얼굴 등록 버튼 -->
-  {% if request.args.get("face") != "success" %}
-    <form method="GET" action="/register/face">
-      <button type="submit">📸 얼굴 등록하기</button>
+    <form method="POST" action="/register">
+      <input type="text" name="student_id" placeholder="학번" value="{{ student_id or '' }}" required><br>
+      <input type="text" name="name" placeholder="이름" value="{{ name or '' }}" required><br>
+      <input type="password" name="password" placeholder="비밀번호" value="{{ password or '' }}" required><br>
+      <button type="submit">회원가입 완료</button>
     </form>
-  {% endif %}
 
+    <div id="face-section">
+      <p style="font-size: 0.95em; color: #555;">
+        😄 <strong>선택 사항</strong>입니다.<br>
+        얼굴 인식 로그인 기능을 이용하려면 등록해 주세요.
+      </p>
+      <p style="font-size: 0.85em; color: #777; margin-top: -5px;">
+        📌 등록 방법:<br>
+        1. '얼굴 등록하기'를 누르면 카메라가 켜집니다.<br>
+        2. 정면을 바라봐 주세요.<br>
+        3. '얼굴 등록' 버튼을 누르면 저장됩니다.<br>
+        4. 이후 회원정보 입력 후 [회원가입 완료]를 눌러주세요.
+      </p>
+
+      <button onclick="showFaceRegister()">📸 얼굴 등록하기</button>
+
+      <div id="face-register-ui" style="display: none; margin-top: 20px;">
+        <img id="face-cam" src="" width="320" height="240" style="border-radius: 12px; border: 1px solid #1976d2;"><br><br>
+
+        <input type="hidden" id="student_id_ajax" value="">
+        <button type="button" onclick="saveFace()">얼굴 등록</button>
+        <button type="button" onclick="hideFaceRegister()">등록 취소</button>
+
+        <p id="face-save-status" style="margin-top:10px; font-weight: bold;"></p>
+      </div>
+    </div>
+
+    <script>
+      function showFaceRegister() {
+        document.getElementById("face-register-ui").style.display = "block";
+        document.getElementById("face-cam").src = "/face_stream"; // ✅ 여기서만 활성화
+        document.getElementById("student_id_ajax").value =
+        document.querySelector('input[name="student_id"]').value;
+      }
+
+      function hideFaceRegister() {
+        document.getElementById("face-register-ui").style.display = "none";
+        document.getElementById("face-save-status").innerText = "";
+        document.getElementById("face-cam").src = ""; // 캠 꺼짐
+        fetch("/stop_stream", { method: "POST" });
+      }
+
+      function saveFace() {
+        const studentId = document.getElementById("student_id_ajax").value;
+
+        fetch("/register/face/save/ajax", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ student_id: studentId })
+        })
+        .then(res => res.json())
+        .then(data => {
+          const status = document.getElementById("face-save-status");
+          if (data.success) {
+            status.innerText = "✅ 얼굴 등록이 완료되었습니다!";
+            hideFaceRegister();
+
+            // 👉 버튼 텍스트 변경
+            const registerBtn = document.querySelector("button[onclick='showFaceRegister()']");
+            registerBtn.innerText = "✅ 얼굴 등록 완료";
+            registerBtn.disabled = true;
+            registerBtn.style.backgroundColor = "#8bc34a";
+          } else {
+            status.innerText = "😥 " + (data.error || "얼굴 인식에 실패했습니다.");
+          }
+        })
+        .catch(() => {
+          document.getElementById("face-save-status").innerText = "⚠️ 요청 실패. 다시 시도해 주세요.";
+        });
+      }
+
+    </script>
+  </div>
 </body>
 </html>

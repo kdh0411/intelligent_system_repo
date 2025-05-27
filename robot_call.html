@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>로봇 호출 제어</title>
+  <style>
+    body {
+      background-color: #e0f2ff;
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #1976d2;
+      margin: 30px 0;
+    }
+
+    .call-buttons {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      max-width: 600px;
+      margin-top: 30px;
+    }
+
+    .call-buttons button {
+      width: 120px;
+      height: 60px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      background-color: #3d8ddd;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .call-buttons button:hover {
+      background-color: #145ea8;
+    }
+
+    .status {
+      margin-top: 30px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .logout-button, .back-button {
+      position: absolute;
+      top: 20px;
+    }
+
+    .logout-button {
+      right: 30px;
+    }
+
+    .back-button {
+      left: 30px;
+    }
+
+    .logout-button button,
+    .back-button button {
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 14px;
+      background-color: #3d8ddd;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .logout-button button:hover,
+    .back-button button:hover {
+      background-color: #145ea8;
+    }
+
+    .map-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-top: 10px;
+      margin-bottom: 100px;
+      width: 301px;
+      height: 201px;
+      transform: scale(1.5);
+      transform-origin: top center;
+    }
+
+    .map-wrapper img,
+    .map-wrapper canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 로그아웃 / 메인 -->
+  <div class="logout-button">
+    <form action="{{ url_for('logout') }}" method="get"><button type="submit">로그아웃</button></form>
+  </div>
+  <div class="back-button">
+    <form action="{{ url_for('main') }}" method="get"><button type="submit">← 메인으로</button></form>
+  </div>
+
+  <!-- 헤더 -->
+  <h1>🤖 로봇 호출 제어</h1>
+
+  <!-- 지도 배경 + 로봇 캔버스 -->
+  <div class="map-wrapper">
+    <img src="{{ url_for('static', filename='0525_library_map_180.png') }}" width="301" height="201">
+    <canvas id="mapCanvas" width="301" height="201"></canvas>
+  </div>
+
+  <!-- 로봇 아이콘 -->
+  <img id="robotIcon" src="{{ url_for('static', filename='상상부기.png') }}" style="display: none;">
+
+  <!-- 버튼 -->
+  <div class="call-buttons">
+    <button onclick="callRobot('shelf1')">📚 테이블 1</button>
+    <button onclick="callRobot('shelf2')">📚 테이블 2</button>
+    <button onclick="callRobot('shelf3')">📚 테이블 3</button>
+    <button onclick="callRobot('shelf4')">📚 테이블 4</button>
+    <button onclick="callRobot('home')">🏠 홈</button>
+  </div>
+
+  <!-- 상태 -->
+  <div class="status" id="status">📡 어디로 갈까요 ?</div>
+
+  <!-- 호출 함수 -->
+  <script>
+    function callRobot(zone) {
+      const statusDiv = document.getElementById("status");
+      statusDiv.innerText = "🤖 로봇이 이동 중입니다. 로봇을 따라가세요!";
+      fetch("/call_robot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: zone })
+      })
+      .then(res => res.json())
+      .then(data => {
+        statusDiv.innerText = data.message;
+      })
+      .catch(err => {
+        statusDiv.innerText = "❌ 로봇 호출 실패: " + err;
+      });
+    }
+  </script>
+
+  <!-- ROS + AMCL -->
+  <script src="{{ url_for('static', filename='roslib.min.js') }}"></script>
+  <script>
+    const ros = new ROSLIB.Ros({ url: "ws://localhost:9090" });
+    ros.on("connection", () => console.log("✅ Connected to ROS"));
+    ros.on("error", err => console.error("❌ ROS 연결 실패", err));
+
+    const listener = new ROSLIB.Topic({
+      ros,
+      name: "/amcl_pose",
+      messageType: "geometry_msgs/PoseWithCovarianceStamped"
+    });
+
+    const canvas = document.getElementById("mapCanvas");
+    const ctx = canvas.getContext("2d");
+    const robotImg = document.getElementById("robotIcon");
+
+    const resolution = 0.05;
+    const origin = { x: -7.525, y: -5.025 };
+
+    function mapToCanvasCoords(x, y) {
+      const px = (x - origin.x) / resolution;
+      const py = (y - origin.y) / resolution;
+      return { x: px, y: 201 - py };
+    }
+
+    function drawRobot(x, y) {
+      const pos = mapToCanvasCoords(x, y);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(robotImg, pos.x - 16, pos.y - 16, 32, 32);
+    }
+
+    listener.subscribe(msg => {
+      const { x, y } = msg.pose.pose.position;
+      drawRobot(x, y);
+    });
+  </script>
+
+</body>
+</html>
