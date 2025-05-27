@@ -1,23 +1,42 @@
 import sqlite3
 import os
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, render_template, request, redirect, session, url_for, jsonify,Response
 from face.face_save import FaceSaver
 from face.face_detect import FaceDetect  
 import json
-from chatbot.chatbot import ChatBot
+from chatbot.chatbot_guide import LibraryGuideBot
+from book.crawling import BookCrawler
+import cv2
+from threading import Event
+from functools import wraps  
+from datetime import timedelta
+from book.summary import BookDetailExtractor
+
 
 # HTML 파일들이 UI 폴더 안에 있으므로 경로 지정
-app = Flask(__name__, template_folder="UI")
+app = Flask(__name__, template_folder="UI", static_folder="UI/static")
+
+app.permanent_session_lifetime = timedelta(minutes=5) #로그인 5분 타이머머
 
 app.secret_key = 'your_secret_key'  # 세션 사용을 위해 필요
 
 # DB 경로
 DB_PATH = os.path.join(os.path.dirname(__file__), "DB", "users.db")
 
+# 세션 기반 로그인 체크용 데코레이터
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "student_id" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # 맨 처음 화면면
 @app.route("/")
-def welcome():
-    return render_template("welcome.html")
+def home():
+    return redirect("/login")  # 바로 로그인 페이지로 이동
+
 
 # ----------------- 회원가입 --------------------#
 #json -> DB 읽어오기
@@ -33,7 +52,7 @@ def register():
         if os.path.exists(temp_path):
             with open(temp_path, "r", encoding="utf-8") as f:
                 embedding = json.load(f)
-            os.remove(temp_path)  # 등록 후 삭제
+            os.remove(temp_path)
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -54,22 +73,39 @@ def register():
         finally:
             conn.close()
 
-        return render_template("register.html", message=message)
+        return redirect("/login")
 
     return render_template("register.html")
 
-# 얼굴 등록
-@app.route("/register/face")
-def register_face():
-    saver = FaceSaver()
-    embedding = saver.register_face()
-    if embedding is not None:
-        with open("face/temp_embedding.json", "w", encoding="utf-8") as f:
-            json.dump(embedding.tolist(), f)
-    return redirect(url_for("register", face="success"))
 
+#얼굴등록 라우트 - 비동기
+@app.route("/register/face/save/ajax", methods=["POST"])
+def register_face_save_ajax():
+    global latest_frame
+
+    if latest_frame is None:
+        return jsonify({"success": False, "error": "캠 프레임 없음"})
+
+    saver = FaceSaver()
+    embedding = saver.extract_embedding(latest_frame)
+
+    if embedding is None:
+        return jsonify({"success": False, "error": "얼굴을 인식하지 못했습니다."})
+
+    with open("face/temp_embedding.json", "w", encoding="utf-8") as f:
+        json.dump(embedding.tolist(), f)
+
+    return jsonify({"success": True})
+
+
+#---------수동 로그아웃------------#
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 # --------------- 로그인 -------------------# 
+# --------------- 학번 로그인 -------------------# 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -83,29 +119,68 @@ def login():
         conn.close()
 
         if user:
-            return redirect(url_for("main", student_id=student_id))
+            session.permanent = True
+            session["student_id"] = student_id
+            return redirect(url_for("main"))
         else:
             return render_template("login.html", message="⚠️ 로그인 정보가 올바르지 않습니다.")
 
     return render_template("login.html")
 
-# 얼굴인식 로그인
-@app.route("/login/face")
-def login_face():
-    detector = FaceDetect()
-    student_id = detector.recognize_face()
+# --------------- 얼굴인식 로그인 -------------------# 
 
-    if student_id == "No Match":
-        return "😥 얼굴 인식 실패! 등록된 얼굴이 없습니다."
+
+# 얼굴 인식기 전역 인스턴스
+face_detector = FaceDetect()
+latest_frame = None  
+stop_event = Event()
+# 캠스트림
+@app.route("/face_stream")
+def face_stream():
+    def generate_frames():
+        global latest_frame
+        camera = cv2.VideoCapture(0)
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        while True:
+            success, frame = camera.read()
+            if not success:
+                break
+            latest_frame = frame.copy()  # 💡 여기서 최신 프레임 저장
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+        camera.release()
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+#캠 종료
+@app.route("/stop_stream", methods=["POST"])
+def stop_stream():
+    stop_event.set()
+    return jsonify({"stopped": True})
+
+#얼굴 인식 라우팅
+@app.route("/detect_face", methods=["POST"])
+def detect_face():
+    global latest_frame
+    if latest_frame is None:
+        return jsonify({"success": False, "error": "프레임 없음"})
+
+    result = face_detector.recognize_face_from_frame(latest_frame)
+
+    if result.get("match"):
+        return jsonify({"success": True, "student_id": result["student_id"]})
     else:
-        return redirect(url_for("main", student_id=student_id))
+        return jsonify({"success": False, "progress": result.get("progress", 0)})
     
-
 
 # --------------- 로그인 후 메인(기능 선택)-------------------# 
 @app.route("/main")
+@login_required
 def main():
-    student_id = request.args.get("student_id")
+    student_id = session["student_id"]
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -120,17 +195,91 @@ def main():
 # --------------- 기능-------------------# 
 
 # ---------------챗봇--------------------#
-@app.route("/chatbot", methods=["GET", "POST"])
-def chatbot():
-    response = None
-    query = None
+bot = LibraryGuideBot()
+
+@app.route("/chat_guide", methods=["GET"])
+@login_required
+def chat_guide():
+    return render_template("chat_guide.html")
+
+@app.route("/chat_guide_api", methods=["POST"])
+@login_required
+def chat_guide_api():
+    data = request.get_json()
+    query = data.get("query", "").strip()
+    
+    if not query:
+        return jsonify({"response": "⚠️ 질문이 비어 있습니다."})
+
+    bot_response = bot.ask(query)
+    return jsonify({"response": bot_response})
+
+# ---------------도서 검색-----------------#
+@app.route("/book", methods=["GET", "POST"])
+@login_required
+def book_search():
+    book_info = None
+    summary = None  # 요약은 무조건 초기화
 
     if request.method == "POST":
-        query = request.form["query"]
-        bot = ChatBot()
-        response = bot.ask(query)
+        regno = request.form.get("regno", "").strip()
+        title = request.form.get("title", "").strip()
+        crawler = BookCrawler()
 
-    return render_template("chatbot.html", query=query, response=response)
+        if regno:
+            book_info = crawler.get_book_info_by_regno(regno)
+        elif title:
+            book_info = crawler.get_book_info_by_title(title)
+
+        # ⚠️ 검색 결과 없으면 오류 표시
+        if not book_info or book_info.get("오류"):
+            book_info = {"오류": "❗ 검색 결과가 없습니다."}
+            session["book_info"] = None
+        else:
+            session["book_info"] = book_info
+
+    return render_template("book_search.html", book_info=book_info, summary=summary)
+
+
+
+# ----------------도서 요약 -----------------#
+@app.route("/book/summary", methods=["POST"])
+@login_required
+def book_summary():
+    rno = request.form.get("rno")
+    extractor = BookDetailExtractor()
+
+    if rno:
+        summary_data = extractor.get_details_by_rno(rno)
+
+        # 📛 요약 결과가 진짜 하나도 없으면 사용자에게 안내
+        if not summary_data or all(not v.strip() for v in summary_data.values()):
+            summary_data = {"오류": "❗ 이 도서는 상세 서지 정보가 제공되지 않습니다."}
+    else:
+        summary_data = {"오류": "❗ 상세 정보를 찾을 수 없습니다 (rno 없음)."}
+
+    return render_template("book_search.html", book_info=session.get("book_info"), summary=summary_data)
+
+
+#---------로봇 호출 ------------#
+#페이지 라우팅
+@app.route("/robot_control", methods=["GET"])
+@login_required
+def robot_control():
+    return render_template("robot_control.html")
+
+#호출 처리
+@app.route("/robot/call", methods=["POST"])
+@login_required
+def robot_call():
+    data = request.get_json()
+    target = data.get("target")
+
+    # 👉 추후 여기에 ROS2 액션 연결 예정
+    print(f"📡 로봇 호출 요청 수신: {target}")
+
+    return jsonify({"message": f"🛰 '{target}' 호출 명령 전송됨"})
+
 
 
 # 서버 실행

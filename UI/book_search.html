@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>도서 정보 검색</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #e0f2ff;
+      margin: 0;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #1976d2;
+      margin-bottom: 30px;
+    }
+
+    form {
+      margin-bottom: 30px;
+    }
+
+    input[type="text"] {
+      padding: 12px;
+      font-size: 1em;
+      width: 280px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      outline: none;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 1em;
+      background-color: #3d8ddd;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #337fc4;
+    }
+
+    .result {
+      margin: 20px auto;
+      padding: 25px;
+      background-color: white;
+      border-radius: 14px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .book-details {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .book-text {
+      flex: 1;
+      text-align: left;
+    }
+
+    .book-text p {
+      margin: 8px 0;
+    }
+
+    .book-text h3 {
+      color: #1976d2;
+      margin-top: 0;
+    }
+
+    .result img {
+      width: 180px;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .result form {
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .logout-button, .back-button {
+      position: absolute;
+      top: 20px;
+    }
+
+    .logout-button {
+      right: 30px;
+    }
+
+    .back-button {
+      left: 30px;
+    }
+
+    .logout-button button,
+    .back-button button {
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 14px;
+      background-color: #3d8ddd;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .logout-button button:hover,
+    .back-button button:hover {
+      background-color: #145ea8;
+    }
+
+    /* 요약 탭 스타일 */
+    .tab-menu {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-link {
+      padding: 10px 18px;
+      background-color: #e0f0ff;
+      border: 2px solid #3d8ddd;
+      color: #3d8ddd;
+      font-weight: bold;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+
+    .tab-link.active {
+      background-color: #3d8ddd;
+      color: white;
+    }
+
+    .tab-link:hover {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .tab-content {
+      text-align: left;
+      line-height: 1.6;
+      display: none;
+    }
+
+    .summary-text {
+      white-space: normal;
+    }
+  </style>
+</head>
+<body>
+  <div class="logout-button">
+    <form action="{{ url_for('logout') }}" method="get">
+      <button type="submit">로그아웃</button>
+    </form>
+  </div>
+
+  <div class="back-button">
+    <form action="{{ url_for('main') }}" method="get">
+      <button type="submit">← 메인으로</button>
+    </form>
+  </div>
+
+  <h1>🔍 등록번호로 도서 정보 검색</h1>
+  <form method="POST" action="/book">
+    <input type="text" name="regno" placeholder="등록번호">
+    <br><br>
+    <input type="text" name="title" placeholder="도서제목">
+    <br><br>
+    <button type="submit">검색</button>
+  </form>
+
+  {% if book_info %}
+    <div class="result">
+      {% if book_info.오류 %}
+        <p style="color: red;">⚠️ {{ book_info.오류 }}</p>
+      {% else %}
+        <div class="book-details">
+          <img src="{{ book_info['이미지'] or url_for('static', filename='default_cover.png') }}" alt="도서 이미지" />
+          <div class="book-text">
+            <h3>📗 도서 정보</h3>
+            <p><strong>제목:</strong> {{ book_info['제목'] }}</p>
+            <p><strong>저자:</strong> {{ book_info['저자'] }}</p>
+            <p><strong>출판사:</strong> {{ book_info['출판사'] }}</p>
+            <p><strong>출판연도:</strong> {{ book_info['출판연도'] }}</p>
+            <p><strong>소장위치:</strong> {{ book_info['소장위치'] }}</p>
+            <p><strong>도서상태:</strong> {{ book_info['도서상태'] }}</p>
+            <p><strong>반납예정일:</strong> {{ book_info['반납예정일'] }}</p>
+            {% if book_info.get('책장위치') %}
+              <p><strong>책장위치:</strong> {{ book_info['책장위치'] }}</p>
+            {% endif %}
+          </div>
+        </div>
+        <form method="POST" action="/book/summary">
+          <input type="hidden" name="title" value="{{ book_info['제목'] }}">
+          <input type="hidden" name="regno" value="{{ book_info['등록번호'] }}">
+          <input type="hidden" name="rno" value="{{ book_info['rno'] }}">
+          <button type="submit">📝 도서 상세 정보</button>
+        </form>
+        {% if book_info.get('책장위치') %}
+          <form method="POST" action="/book/guide">
+            <input type="hidden" name="shelf" value="{{ book_info['책장위치'] }}">
+            <button type="submit">📍 도서 위치 안내받기</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if summary %}
+    <div class="result">
+      <h3>📘 요약 결과</h3>
+      <div class="tabs">
+        <div class="tab-menu">
+          {% for key in summary %}
+            <button class="tab-link" data-tab="tab-{{ loop.index }}">{{ key }}</button>
+          {% endfor %}
+        </div>
+        {% for key, val in summary.items() %}
+          <div id="tab-{{ loop.index }}" class="tab-content">
+            <div class="summary-text">{{ val.replace('\n', '<br>')|safe }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      const tabLinks = document.querySelectorAll(".tab-link");
+      const tabContents = document.querySelectorAll(".tab-content");
+
+      tabLinks.forEach(btn => {
+        btn.addEventListener("click", () => {
+          tabLinks.forEach(b => b.classList.remove("active"));
+          tabContents.forEach(c => c.style.display = "none");
+          btn.classList.add("active");
+          document.getElementById(btn.dataset.tab).style.display = "block";
+        });
+      });
+
+      if (tabLinks.length > 0) tabLinks[0].click();
+    </script>
+  {% endif %}
+</body>
+</html>
