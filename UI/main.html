@@ -1,0 +1,95 @@
+<!-- UI/main.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI 도서관 키오스크 - 메인</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e0f2ff;
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      text-align: center;
+      background-color: white;
+      padding: 40px 30px;
+      border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      max-width: 360px;
+      width: 90%;
+    }
+
+    h1 {
+      color: #1976d2;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .card-button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 14px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 14px;
+      background-color: #3d8ddd;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .card-button:hover {
+      background-color: #145ea8;
+    }
+    .logout-button {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+    }
+
+    .logout-button button {
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 14px;
+      background-color: #3d8ddd;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .logout-button button:hover {
+      background-color: #145ea8;
+    }
+  </style>
+</head>
+<body>
+  <div class="logout-button">
+    <form action="{{ url_for('logout') }}" method="get">
+      <button type="submit">로그아웃</button>
+    </form>
+  </div>
+  <div class="container">
+    <h1>📚 환영합니다, {{ name }}님!</h1>
+    <p>원하는 기능을 선택하세요.</p>
+
+    <button class="card-button" onclick="location.href='/robot_call'">🤖 로봇 호출 제어</button>
+    <button class="card-button" onclick="location.href='/chat_guide'">💬 챗봇 도서관 도우미</button>
+    <button class="card-button" onclick="location.href='/book'">📷 도서 정보 검색</button>
+  </div>
+</body>
+</html>
