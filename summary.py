@@ -1,51 +1,66 @@
-# book/summary.py
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import traceback
 
-import requests
-import json
+class BookDetailExtractor:
+    def __init__(self):
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("window-size=1920x1080")
+        options.add_argument("user-agent=Mozilla/5.0")
+        self.options = options
 
-class BookSummary:
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.api_url = "https://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+    def get_details_by_rno(self, rno):
+        return self._extract_details(rno=rno)
 
-    def get_summary(self, title, author):
-        params = {
-            "ttbkey": self.api_key,
-            "Query": title,  # 제목만 검색
-            "QueryType": "Title",
-            "SearchTarget": "Book",
-            "output": "js",
-            "Version": "20131101"
-        }
+    def _extract_details(self, rno):
+        driver = webdriver.Chrome(options=self.options)
+        wait = WebDriverWait(driver, 10)
+        details = {}
 
         try:
-            response = requests.get(self.api_url, params=params)
-            raw = response.text
-            print("📥 응답 내용:\n", raw)
-            # JSONP: ttb.api({...}) → {...}
-            start = raw.find("{")
-            end = raw.rfind("}")
-            if start == -1 or end == -1:
-                return "⚠️ 응답 파싱 실패"
+            detail_url = f"https://hsel.hansung.ac.kr/data_view.mir?rno={rno}&hloc_code=HSEL"
+            driver.get(detail_url)
 
-            json_str = raw[start:end+1]
-            data = json.loads(json_str)
+            headers = driver.find_elements(By.CSS_SELECTOR, "#panel h4.sub_title")
+            valid_labels = ["책소개", "목차", "저자소개", "본문중에서"]
 
-            # author 포함된 항목만 필터링
-            if "item" in data:
-                for item in data["item"]:
-                    if author in item.get("author", ""):
-                        return item.get("description", "요약 정보가 없습니다.")
-                return f"❌ '{author}' 저자 도서가 검색 결과에 없음."
-            else:
-                return "도서를 찾을 수 없습니다."
+            for h in headers:
+                try:
+                    label = h.text.strip().replace("\xa0", "").replace(" ", "").replace("\n", "")
+                    if label not in valid_labels:
+                        continue
+
+                    content_div = h.find_element(By.XPATH, "following-sibling::div[@class='well']")
+                    content = content_div.get_attribute("innerHTML").strip()
+                    content = content.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+
+                    if content:
+                        details[label] = content
+
+                except Exception as e:
+                    print(f"[{label}] 내용 추출 실패 (무시됨): {e}")
+                    continue
 
         except Exception as e:
-            return f"⚠️ 오류 발생: {e}"
+            traceback.print_exc()
+            details = {"오류": f"❗ 상세정보 추출 실패: {e}"}
+        finally:
+            driver.quit()
 
-# 테스트 실행
+        return details
+
+
+# ✅ 테스트
 if __name__ == "__main__":
-    API_KEY = "thasdfekgsot0290901"
-    bs = BookSummary(api_key=API_KEY)
-    summary = bs.get_summary("한강", "박정래")
-    print("📘 요약 결과:\n", summary)
+    extractor = BookDetailExtractor()
+    print("\n🔍 rno 기반 상세정보 테스트")
+    res = extractor.get_details_by_rno("585694")  # 예시 책
+    for k, v in res.items():
+        print(f"[{k}]\n{v[:300]}...\n")
